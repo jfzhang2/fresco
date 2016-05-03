@@ -43,6 +43,7 @@ import static com.facebook.drawee.components.DraweeEventTracker.Event;
  * @param <T> image type (e.g. Bitmap)
  * @param <INFO> image info type (can be same as T)
  */
+//所有的方法的调用 都应该放置在主线程中
 @NotThreadSafe
 public abstract class AbstractDraweeController<T, INFO> implements
     DraweeController,
@@ -66,6 +67,9 @@ public abstract class AbstractDraweeController<T, INFO> implements
 
   private static final Class<?> TAG = AbstractDraweeController.class;
 
+  //创建了事件追踪器
+  //创建了资源的释放器
+  //创建了ui的线程执行者
   // Components
   private final DraweeEventTracker mEventTracker = new DraweeEventTracker();
   private final DeferredReleaser mDeferredReleaser;
@@ -87,10 +91,13 @@ public abstract class AbstractDraweeController<T, INFO> implements
   // Mutable state
   private boolean mIsAttached;
   private boolean mIsRequestSubmitted;
+  //判断当前是否是抓取失败
   private boolean mHasFetchFailed;
   private boolean mRetainImageOnFailure;
+  //数据源的对象
   private @Nullable DataSource<T> mDataSource;
   private @Nullable T mFetchedImage;
+  //当前的drawable的对象
   private @Nullable Drawable mDrawable;
 
   public AbstractDraweeController(
@@ -98,8 +105,10 @@ public abstract class AbstractDraweeController<T, INFO> implements
       Executor uiThreadImmediateExecutor,
       String id,
       Object callerContext) {
+    //创建释放器的对象
     mDeferredReleaser = deferredReleaser;
     mUiThreadImmediateExecutor = uiThreadImmediateExecutor;
+    //初始化的对象
     init(id, callerContext);
   }
 
@@ -115,12 +124,14 @@ public abstract class AbstractDraweeController<T, INFO> implements
   }
 
   private void init(String id, Object callerContext) {
+    //当前的事件是初始化 事件
     mEventTracker.recordEvent(Event.ON_INIT_CONTROLLER);
     // cancel deferred release
     if (mDeferredReleaser != null) {
       mDeferredReleaser.cancelDeferredRelease(this);
     }
     // reinitialize mutable state (fetch state)
+    //重新初始化状态
     mIsAttached = false;
     releaseFetch();
     mRetainImageOnFailure = false;
@@ -154,7 +165,9 @@ public abstract class AbstractDraweeController<T, INFO> implements
 
   @Override
   public void release() {
+    //记录当前的事件
     mEventTracker.recordEvent(Event.ON_RELEASE_CONTROLLER);
+    //重试的事件管理器进行状态的重置
     if (mRetryManager != null) {
       mRetryManager.reset();
     }
@@ -181,6 +194,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
     mDrawable = null;
     if (mFetchedImage != null) {
       logMessageAndImage("release", mFetchedImage);
+      //释放图片的对象的资源
       releaseImage(mFetchedImage);
       mFetchedImage = null;
     }
@@ -190,6 +204,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
   }
 
   /** Gets the controller id. */
+  //获取控制器的id的编号
   public String getId() {
     return mId;
   }
@@ -200,6 +215,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
   }
 
   /** Gets retry manager. */
+  //获取重试的管理器的对象
   protected @Nullable RetryManager getRetryManager() {
     return mRetryManager;
   }
@@ -381,6 +397,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
     if (FLog.isLoggable(FLog.VERBOSE)) {
       FLog.v(TAG, "controller %x %s: onClick", System.identityHashCode(this), mId);
     }
+    //进行图片的请求的重新处理
     if (shouldRetryOnTap()) {
       mRetryManager.notifyTapToRetry();
       mSettableDraweeHierarchy.reset();
@@ -453,6 +470,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
     mEventTracker.recordEvent(
         isFinished ? Event.ON_DATASOURCE_RESULT : Event.ON_DATASOURCE_RESULT_INT);
     // create drawable
+    //创建Drawable的对象
     Drawable drawable;
     try {
       drawable = createDrawable(image);
@@ -491,6 +509,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
     }
   }
 
+  //内部失败的处理
   private void onFailureInternal(
       String id,
       DataSource<T> dataSource,
@@ -517,6 +536,7 @@ public abstract class AbstractDraweeController<T, INFO> implements
       } else {
         mSettableDraweeHierarchy.setFailure(throwable);
       }
+      //失败的事件的回调
       getControllerListener().onFailure(mId, throwable);
       // IMPORTANT: do not execute any instance-specific code after this point
     } else {
